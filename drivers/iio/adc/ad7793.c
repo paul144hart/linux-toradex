@@ -142,6 +142,9 @@
 #define AD7793_FLAG_HAS_GAIN		BIT(4)
 #define AD7793_FLAG_HAS_BUFFER		BIT(5)
 
+// turn off brute force reset
+//#define SUNIL 1
+
 struct ad7793_chip_info {
 	unsigned int id;
 	const struct iio_chan_spec *channels;
@@ -180,7 +183,7 @@ enum ad7793_supported_device_ids {
 static struct ad7793_platform_data ad7793_pdata =  {
 		.clock_src = AD7793_CLK_SRC_INT,
 		.unipolar = true,
-		.buffered = false,
+		.buffered = true,
 		.refsel = AD7793_REFSEL_REFIN1,
 		.bias_voltage = AD7793_BIAS_VOLTAGE_DISABLED,
 		.exitation_current = 	AD7793_IX_DISABLED, 
@@ -318,7 +321,6 @@ static int ad7793_setup(struct iio_dev *indio_dev,
 		st->conf |= AD7793_CONF_GAIN(7);
 
 	ret = ad7793_set_mode(&st->sd, AD_SD_MODE_IDLE);
-	printk(KERN_DEBUG " ad7793_set_mode = %d   \n", ret);
 	if (ret)
 		goto out;
 
@@ -469,30 +471,28 @@ static int ad7793_read_raw(struct iio_dev *indio_dev,
 			   int *val2,
 			   long m)
 {
-	// modified by PGrosshart
-	//int average;
-	//int pointer = 0;
-
+	
 	struct ad7793_state *st = iio_priv(indio_dev);
 	int ret;
+
+#ifdef SUNIL
 	int reset_st = 0xFFFFFFFF; //for reset added by sunil 5/10/17
+#endif
+
 	unsigned long long scale_uv;
 	bool unipolar = !!(st->conf & AD7793_CONF_UNIPOLAR);
 
 	switch (m) {
 	case IIO_CHAN_INFO_RAW:
+
+#ifdef SUNIL
 		//Reset ADC -Sunil 5/10/17
 		ret = spi_write(st->sd.spi,&reset_st,sizeof(reset_st));
 		usleep_range(500, 2000); /* Wait for at least 500us */
 		// end of adding reset
-//		ret = ad_sigma_delta_single_conversion(indio_dev, chan, val); // PGrosshart!
+#endif
+
 		ret = ad_sigma_delta_single_conversion(indio_dev, chan, val); // PGrosshart!
-	//	average = 0;
-	//	for ( pointer = 0; pointer < 4; pointer++) { 
-	//		average += ad_sigma_delta_single_conversion(indio_dev, chan, val);
-	//		usleep_range(500, 2000); /* Wait for at least 500us */
-	//	}
-	//	ret = average / 4;
 		if (ret < 0)
 			return ret;
 
@@ -555,7 +555,6 @@ static int ad7793_write_raw(struct iio_dev *indio_dev,
 	int ret, i;
 	unsigned int tmp;
 
-	printk(KERN_DEBUG " inside  ad7793_write_raw   \n");
 	mutex_lock(&indio_dev->mlock);
 	if (iio_buffer_enabled(indio_dev)) {
 		mutex_unlock(&indio_dev->mlock);
@@ -777,12 +776,12 @@ static int ad7793_probe(struct spi_device *spi)
 	struct iio_dev *indio_dev;
 	int ret, vref_mv = 0;
 
-	printk("ad7793_probe Version 3.1415.2 \n ");
+	printk("ad7793_probe Version Star Date Jan 25 2018 \n ");
 	if (!pdata) {
 		dev_err(&spi->dev, "no platform data support in device tree addding  manually\n");
 		return -ENODEV;
 	}
-	
+		/*Kiran Bhosale: DOUT/RDY  gpio intrrupt connected to SODIMM_77*/	
 	spi->irq = gpio_to_irq(44);
 	printk("the AD7798 IRQ = %d \n ",spi->irq);
 	if (!spi->irq) {
@@ -825,7 +824,6 @@ static int ad7793_probe(struct spi_device *spi)
 	indio_dev->dev.parent = &spi->dev;
 	indio_dev->name = spi_get_device_id(spi)->name;
 	indio_dev->modes = INDIO_DIRECT_MODE;
-	printk("Mode for AD7793 is %x\n", indio_dev->modes );   // Paul Grosshart strikes again!
 	indio_dev->channels = st->chip_info->channels;
 	indio_dev->num_channels = st->chip_info->num_channels;
 	indio_dev->info = st->chip_info->iio_info;
