@@ -527,7 +527,19 @@ static void flush_to_ldisc(struct work_struct *work)
 
 void tty_flip_buffer_push(struct tty_port *port)
 {
-	tty_schedule_flip(port);
+/*	tty_schedule_flip(port); ...was */
+	struct tty_bufhead *buf = &port->buf;
+
+      if(port->low_latency==0)
+         {
+            tty_schedule_flip(port);
+         }
+      else 
+         {
+            buf->tail->commit = buf->tail->used;   /* missing line fro patch */
+            flush_to_ldisc(&buf->work);
+         }
+
 }
 EXPORT_SYMBOL(tty_flip_buffer_push);
 

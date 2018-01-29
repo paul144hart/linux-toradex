@@ -142,8 +142,7 @@
 #define AD7793_FLAG_HAS_GAIN		BIT(4)
 #define AD7793_FLAG_HAS_BUFFER		BIT(5)
 
-// turn off brute force reset
-//#define SUNIL 1
+#define SUNIL 1
 
 struct ad7793_chip_info {
 	unsigned int id;
