@@ -441,6 +441,7 @@ receive_buf(struct tty_struct *tty, struct tty_buffer *head, int count)
 		count = disc->ops->receive_buf2(tty, p, f, count);
 	else {
 		count = min_t(int, count, tty->receive_room);
+		//printk("calling disc->ops->receive_buf with count=%d  %s %d\n",count,__FUNCTION__,__LINE__);
 		if (count)
 			disc->ops->receive_buf(tty, p, f, count);
 	}
@@ -470,13 +471,21 @@ static void flush_to_ldisc(struct work_struct *work)
 
 	tty = port->itty;
 	if (tty == NULL)
+	{
+		//printk("tty is NULL, returning %s %d\n",__FUNCTION__,__LINE__);
 		return;
+	}
 
 	disc = tty_ldisc_ref(tty);
 	if (disc == NULL)
+	{
+		//printk("disc is NULL, returning %s %d\n",__FUNCTION__,__LINE__);
 		return;
+	}
 
+	//printk("a %s %d\n",__FUNCTION__,__LINE__);
 	mutex_lock(&buf->lock);
+	//printk("b %s %d\n",__FUNCTION__,__LINE__);
 
 	while (1) {
 		struct tty_buffer *head = buf->head;
@@ -485,7 +494,10 @@ static void flush_to_ldisc(struct work_struct *work)
 
 		/* Ldisc or user is trying to gain exclusive access */
 		if (atomic_read(&buf->priority))
+		{
+			//printk("c %s %d\n",__FUNCTION__,__LINE__);
 			break;
+		}
 
 		next = head->next;
 		/* paired w/ barrier in __tty_buffer_request_room();
@@ -494,16 +506,19 @@ static void flush_to_ldisc(struct work_struct *work)
 		 */
 		smp_rmb();
 		count = head->commit - head->read;
+		//printk("d count=%d %s %d\n",count,__FUNCTION__,__LINE__);
 		if (!count) {
 			if (next == NULL) {
 				check_other_closed(tty);
+				//printk("e %s %d\n",__FUNCTION__,__LINE__);
 				break;
 			}
 			buf->head = next;
 			tty_buffer_free(port, head);
+			//printk("f %s %d\n",__FUNCTION__,__LINE__);
 			continue;
 		}
-
+		//printk("calling receive_buf with count=%d  %s %d\n",count,__FUNCTION__,__LINE__);
 		count = receive_buf(tty, head, count);
 		if (!count)
 			break;
@@ -527,19 +542,18 @@ static void flush_to_ldisc(struct work_struct *work)
 
 void tty_flip_buffer_push(struct tty_port *port)
 {
-/*	tty_schedule_flip(port); ...was */
-	struct tty_bufhead *buf = &port->buf;
+	//tty_schedule_flip(port);
+struct tty_bufhead *buf = &port->buf;
 
       if(port->low_latency==0)
-         {
             tty_schedule_flip(port);
-         }
-      else 
-         {
-            buf->tail->commit = buf->tail->used;   /* missing line fro patch */
-            flush_to_ldisc(&buf->work);
-         }
-
+      else
+	{
+	    buf->tail->commit = buf->tail->used;
+	    //printk("a %s %d\n",__FUNCTION__,__LINE__);
+	    //printk("Calling flush_to_ldisc directly count=%d\n",(buf->head->commit-buf->head->read));
+            flush_to_ldisc(&buf->work); 
+	}
 }
 EXPORT_SYMBOL(tty_flip_buffer_push);
 
