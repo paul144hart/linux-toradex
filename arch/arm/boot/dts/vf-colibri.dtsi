@@ -82,19 +82,9 @@
 &fec1 {
 	phy-mode = "rmii";
 	phy-supply = <&sys_3v3_reg>;
+	max-speed = <10>; /* PG */
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_fec1>;
-/*
-	mdio {
-		address-cells = <1>;
-		size-cells = <0>;
-
-		ethphy0: ethernet-phy@0 {
-			reg = <0>; 
-			max-speed = <10>;
-		};
-	};
-*/
 };
 
 &i2c0 {
@@ -427,7 +417,6 @@
 			fsl,pins = <
 				VF610_PAD_PTD0__UART2_TX		0x21a2
 				VF610_PAD_PTD1__UART2_RX		0x21a1
-				/*VF610_PAD_PTD2__UART2_RTS		0x2122  /* pull down */
 				VF610_PAD_PTD2__UART2_RTS		0x21a2
 			/*	VF610_PAD_PTD3__UART2_CTS		0x21a1 */
 			>;
