@@ -1442,7 +1442,9 @@ static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
 {
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *port = state->uart_port;
-	unsigned long char_time, expire;
+	unsigned long /* char_time,*/ expire;
+/* pfg test */
+//	int counter;
 
 	if (port->type == PORT_UNKNOWN || port->fifosize == 0)
 		return;
@@ -1455,13 +1457,13 @@ static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
 	 * Note: we have to use pretty tight timings here to satisfy
 	 * the NIST-PCTS.
 	 */
-	char_time = (port->timeout - HZ/50) / port->fifosize;
+/*	char_time = (port->timeout - HZ/50) / port->fifosize;
 	char_time = char_time / 5;
 	if (char_time == 0)
 		char_time = 1;
 	if (timeout && timeout < char_time)
 		char_time = timeout;
-
+*/
 	/*
 	 * If the transmitter hasn't cleared in twice the approximate
 	 * amount of time to send the entire FIFO, it probably won't
@@ -1471,26 +1473,37 @@ static void uart_wait_until_sent(struct tty_struct *tty, int timeout)
 	 * UART bug of some kind.  So, we clamp the timeout parameter at
 	 * 2*port->timeout.
 	 */
-	if (timeout == 0 || timeout > 2 * port->timeout)
+/*	if (timeout == 0 || timeout > 2 * port->timeout)
 		timeout = 2 * port->timeout;
+*/
+	if ( timeout == 0 ) {
+		timeout = 10; // default to 10 ms
+	}
 
-	expire = jiffies + timeout;
+	expire = jiffies + 2 * timeout;  // knowing we are using 1000HZ time tics
 
-	pr_debug("uart_wait_until_sent(%d), jiffies=%lu, expire=%lu...\n",
-		port->line, jiffies, expire);
+//	pr_debug("uart_wait_until_sent(%d), jiffies=%lu, expire=%lu...\n",
+//		port->line, jiffies, expire);
 
 	/*
 	 * Check whether the transmitter is empty every 'char_time'.
 	 * 'timeout' / 'expire' give us the maximum amount of time
 	 * we wait.
 	 */
-	while (!port->ops->tx_empty(port)) {
+	while (1) {
 		//msleep_interruptible(jiffies_to_msecs(char_time));
-		udelay(jiffies_to_msecs(char_time));
+		udelay(jiffies_to_msecs(timeout));
+//		udelay(jiffies_to_msecs(char_time));
 		if (signal_pending(current))
 			break;
-		if (time_after(jiffies, expire))
+		if (port->ops->tx_empty(port)) {
+	//		printk(KERN_INFO "wait: tx_empty\n");
 			break;
+		}
+		if (time_after(jiffies, expire)) {
+			printk(KERN_INFO "wait: time_after expired; tout was %d\n", timeout);
+			break;
+		}
 	}
 }
 
