@@ -33,11 +33,7 @@
 	extcon_usbc_det: usbc_det {
 		compatible = "linux,extcon-usb-gpio";
 		debounce = <25>;
-#if 0
-		id-gpio = <&gpio3 6 GPIO_ACTIVE_HIGH>;
-#else		
 		id-gpio = <&gpio2 25 GPIO_ACTIVE_HIGH>; /*SODIMM_133*/
-#endif 	
 		pinctrl-names = "default";
 		/*pinctrl-0 = <&pinctrl_usbc_det>;*/
 	};
@@ -104,12 +100,8 @@
 &bl {
 	/*brightness-levels = <0 4 8 16 32 64 128 255>;*/
 	max-brightness = <250>;
-	/* default-brightness-level = <20>; */
 	default-brightness-level = <25>; /* changed by Paul G 4/26/2017 */
-	/*default-brightness-level = <8>; */ /* changed by Paul G 4/26/2017 */
-/*	pwms = <&pwm0 0 50000 0>;*/
 	pwms = <&pwm0 0 1250 0>;
-	/*pwms = <&pwm0 0 100000 0>;*/
 	status  = "okay";
 };
 
@@ -124,94 +116,20 @@
 		bits-per-pixel = <16>;
 
 		display-timings {
-			native-mode = <&timing_vga>;
-			/* WVGA Timing, TouchRevolution Fusion 7" */
-			timing_wvga2: 800x480pixclkact {
-				clock-frequency = <11000000>;
-				hactive = <800>;
-				vactive = <600>;
-				hback-porch = <216>;
-				hfront-porch = <40>;
-				vback-porch = <35>;
-				vfront-porch = <10>;
-				hsync-len = <128>;
-				vsync-len = <2>;
-				hsync-active = <0>;
-				vsync-active = <0>;
-				pixelclk-active = <1>;
-			};
-			/* Standard VGA timing */
-			timing_vga: 640x480 {
-				clock-frequency = <25175000>;
-				hactive = <640>;
-				vactive = <480>;
-				hback-porch = <40>;
-				hfront-porch = <24>;
-				vback-porch = <32>;
-				vfront-porch = <11>;
-				hsync-len = <96>;
-				vsync-len = <2>;
-				hsync-active = <0>;
-				vsync-active = <0>;
-				pixelclk-active = <0>;
-			};
+			native-mode = <&timing_wvga>;
 			/* new settings - Setra Display */
 			/* WVGA Timing, e.g. EDT ET070080DH6 */
 			timing_wvga: 800x480 {
 				clock-frequency = <33000000>;
 				hactive = <800>;
 				vactive = <480>;
-				hback-porch = <216>;
-				hfront-porch = <40>;
-				vback-porch = <35>;
-				vfront-porch = <10>;
-				hsync-len = <128>;
+				hback-porch = <3>;
+				/* hback-porch = <3>; */
+				hfront-porch = <83>;
+				vback-porch = <3>;
+				vfront-porch = <30>;
+				hsync-len = <64>;  /* 128 */
 				vsync-len = <2>;
-				hsync-active = <0>;
-				vsync-active = <0>;
-				pixelclk-active = <0>;
-			};
-			/* Standard SVGA timing */
-			timing_svga: 800x600 {
-				clock-frequency = <40000000>;
-				hactive = <800>;
-				vactive = <600>;
-				hback-porch = <88>;
-				hfront-porch = <40>;
-				vback-porch = <23>;
-				vfront-porch = <1>;
-				hsync-len = <128>;
-				vsync-len = <4>;
-				hsync-active = <1>;
-				vsync-active = <1>;
-				pixelclk-active = <0>;
-			};
-			/* TouchRevolution Fusion 10"/CLAA101NC05 10.1 inch */
-			timing_wsvga: 1024x600 {
-				clock-frequency = <48000000>;
-				hactive = <1024>;
-				vactive = <600>;
-				hback-porch = <104>;
-				hfront-porch = <43>;
-				vback-porch = <24>;
-				vfront-porch = <20>;
-				hsync-len = <5>;
-				vsync-len = <5>;
-				hsync-active = <0>;
-				vsync-active = <0>;
-				pixelclk-active = <0>;
-			};
-			/* Standard XGA timing */
-			timing_xga: 1024x768 {
-				clock-frequency = <65000000>;
-				hactive = <1024>;
-				vactive = <768>;
-				hback-porch = <160>;
-				hfront-porch = <24>;
-				vback-porch = <29>;
-				vfront-porch = <3>;
-				hsync-len = <136>;
-				vsync-len = <6>;
 				hsync-active = <0>;
 				vsync-active = <0>;
 				pixelclk-active = <0>;
