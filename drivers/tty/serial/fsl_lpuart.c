@@ -9,6 +9,11 @@
  * (at your option) any later version.
  */
 
+//#####################################################################
+//	modified by PFG for interrupt testing / timing
+//  modified by CLB for integration with MS/TP for port 2
+//#####################################################################
+
 #if defined(CONFIG_SERIAL_FSL_LPUART_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
 #endif
@@ -27,6 +32,7 @@
 #include <linux/serial_core.h>
 #include <linux/slab.h>
 #include <linux/tty_flip.h>
+#include <asm/gpio.h>
 
 /* All registers are 8-bit width */
 #define UARTBDH			0x00
@@ -230,6 +236,8 @@
 #define DEV_NAME	"ttyLP"
 #define UART_NR		6
 
+int SilenceTimer=0;						//		***CLB
+EXPORT_SYMBOL(SilenceTimer);			//		***CLB
 static bool nodma = true;
 module_param(nodma, bool, S_IRUGO);
 
@@ -500,6 +508,7 @@ static inline void lpuart_transmit_buffer(struct lpuart_port *sport)
 {
 	struct circ_buf *xmit = &sport->port.state->xmit;
 
+	//        gpio_set_value(88, 1);
 	while (!uart_circ_empty(xmit) &&
 		(readb(sport->port.membase + UARTTCFIFO) < sport->txfifo_size)) {
 		writeb(xmit->buf[xmit->tail], sport->port.membase + UARTDR);
@@ -512,6 +521,7 @@ static inline void lpuart_transmit_buffer(struct lpuart_port *sport)
 
 	if (uart_circ_empty(xmit))
 		lpuart_stop_tx(&sport->port);
+	//       gpio_set_value(88, 0);
 }
 
 static inline void lpuart32_transmit_buffer(struct lpuart_port *sport)
@@ -569,6 +579,7 @@ static void lpuart32_start_tx(struct uart_port *port)
 		lpuart32_transmit_buffer(sport);
 }
 
+/*********** transmit interrupt - this is it for FLEX  *********************/
 static irqreturn_t lpuart_txint(int irq, void *dev_id)
 {
 	struct lpuart_port *sport = dev_id;
@@ -576,6 +587,7 @@ static irqreturn_t lpuart_txint(int irq, void *dev_id)
 	unsigned long flags;
 
 	spin_lock_irqsave(&sport->port.lock, flags);
+	gpio_set_value(41, 1);
 	if (sport->port.x_char) {
 		if (sport->lpuart32)
 			lpuart32_write(sport->port.x_char, sport->port.membase + UARTDATA);
@@ -602,9 +614,12 @@ static irqreturn_t lpuart_txint(int irq, void *dev_id)
 
 out:
 	spin_unlock_irqrestore(&sport->port.lock, flags);
+	gpio_set_value(41, 0);
 	return IRQ_HANDLED;
 }
 
+
+/*********** receive interrupt modified *********************/
 static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 {
 	struct lpuart_port *sport = dev_id;
@@ -612,9 +627,14 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 	struct tty_port *port = &sport->port.state->port;
 	unsigned long flags;
 	unsigned char rx, sr;
+	if (sport->port.irq_wake)
+		pm_wakeup_event(port->tty->dev, 0);
 
 	spin_lock_irqsave(&sport->port.lock, flags);
-
+#if 0
+/* write high to time the interrupt */
+gpio_set_value(88, 1);
+#endif
 	while (!(readb(sport->port.membase + UARTSFIFO) & UARTSFIFO_RXEMPT)) {
 		flg = TTY_NORMAL;
 		sport->port.icount.rx++;
@@ -625,45 +645,55 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 		sr = readb(sport->port.membase + UARTSR1);
 		rx = readb(sport->port.membase + UARTDR);
 
-		if (uart_handle_sysrq_char(&sport->port, (unsigned char)rx))
-			continue;
-
-		if (sr & (UARTSR1_PE | UARTSR1_OR | UARTSR1_FE)) {
-			if (sr & UARTSR1_PE)
-				sport->port.icount.parity++;
-			else if (sr & UARTSR1_FE)
-				sport->port.icount.frame++;
-
-			if (sr & UARTSR1_OR)
-				sport->port.icount.overrun++;
-
-			if (sr & sport->port.ignore_status_mask) {
-				if (++ignored > 100)
-					goto out;
+		if (port->tty->index != 2)											//				***CLB Begin
+		{
+			if (uart_handle_sysrq_char(&sport->port, (unsigned char)rx))
 				continue;
-			}
 
-			sr &= sport->port.read_status_mask;
+			if (sr & (UARTSR1_PE | UARTSR1_OR | UARTSR1_FE)) {
+				if (sr & UARTSR1_PE)
+					sport->port.icount.parity++;
+				else if (sr & UARTSR1_FE)
+					sport->port.icount.frame++;
 
-			if (sr & UARTSR1_PE)
-				flg = TTY_PARITY;
-			else if (sr & UARTSR1_FE)
-				flg = TTY_FRAME;
+				if (sr & UARTSR1_OR)
+					sport->port.icount.overrun++;
 
-			if (sr & UARTSR1_OR)
-				flg = TTY_OVERRUN;
+				if (sr & sport->port.ignore_status_mask) {
+					if (++ignored > 100)
+						goto out;
+					continue;
+				}
+
+				sr &= sport->port.read_status_mask;
+
+				if (sr & UARTSR1_PE)
+					flg = TTY_PARITY;
+				else if (sr & UARTSR1_FE)
+					flg = TTY_FRAME;
+
+				if (sr & UARTSR1_OR)
+					flg = TTY_OVERRUN;
 
 #ifdef SUPPORT_SYSRQ
-			sport->port.sysrq = 0;
+				sport->port.sysrq = 0;
 #endif
-		}
-
+			}
+		}																	//				***CLB End
 		tty_insert_flip_char(port, rx, flg);
+		goto out; // hopefully turns into byte by byte RX ***PFG
 	}
 
 out:
+#if 0
+/* write low after interrupt */
+gpio_set_value(88, 0);
+#endif
 	spin_unlock_irqrestore(&sport->port.lock, flags);
-
+#if 0
+	gpio_set_value(88, 1);
+#endif
+	if (port->tty->index == 2) SilenceTimer = 0;							//				***CLB
 	tty_flip_buffer_push(port);
 	return IRQ_HANDLED;
 }
@@ -737,6 +767,7 @@ static irqreturn_t lpuart_int(int irq, void *dev_id)
 	struct lpuart_port *sport = dev_id;
 	unsigned char sts, crdma;
 
+	//gpio_set_value(88, 1);
 	sts = readb(sport->port.membase + UARTSR1);
 	crdma = readb(sport->port.membase + UARTCR5);
 
@@ -750,7 +781,7 @@ static irqreturn_t lpuart_int(int irq, void *dev_id)
 		BUG_ON(sport->lpuart_dma_tx_use);
 		lpuart_txint(irq, dev_id);
 	}
-
+	//gpio_set_value(88, 0);
 	return IRQ_HANDLED;
 }
 
@@ -949,6 +980,9 @@ static void lpuart_setup_watermark(struct lpuart_port *sport)
 	writeb(val | UARTPFIFO_TXFE | UARTPFIFO_RXFE,
 			sport->port.membase + UARTPFIFO);
 
+	/* explicitly clear RDRF */										//	*** CLB, this was moved in a later commit
+	readb(sport->port.membase + UARTSR1);							//			 but based on the initial commit, I think it's important
+	
 	/* flush Tx and Rx FIFO */
 	writeb(UARTCFIFO_TXFLUSH | UARTCFIFO_RXFLUSH,
 			sport->port.membase + UARTCFIFO);
@@ -1110,10 +1144,13 @@ static int lpuart_startup(struct uart_port *port)
 	sport->txfifo_size = 0x1 << (((temp >> UARTPFIFO_TXSIZE_OFF) &
 		UARTPFIFO_FIFOSIZE_MASK) + 1);
 
-	sport->port.fifosize = sport->txfifo_size;
+	//sport->port.fifosize = sport->txfifo_size;
+	sport->port.fifosize = 1;										//								***CLB
 
-	sport->rxfifo_size = 0x1 << (((temp >> UARTPFIFO_RXSIZE_OFF) &
-		UARTPFIFO_FIFOSIZE_MASK) + 1);
+	//sport->rxfifo_size = 0x1 << (((temp >> UARTPFIFO_RXSIZE_OFF) &
+	//	UARTPFIFO_FIFOSIZE_MASK) + 1);
+	//sport->port.fifosize = 1;			<-- 13-Mar-2018 removed this in hotel, put back if MS/TP test fails		***CLB
+	sport->rxfifo_size = 1;			// <-- 13-Mar-2018 removed this in hotel, put back if MS/TP test fails		***CLB
 
 	if (sport->dma_rx_chan && !lpuart_dma_rx_request(port)) {
 		sport->lpuart_dma_rx_use = true;
@@ -1234,13 +1271,14 @@ lpuart_set_termios(struct uart_port *port, struct ktermios *termios,
 {
 	struct lpuart_port *sport = container_of(port, struct lpuart_port, port);
 	unsigned long flags;
-	unsigned char cr1, old_cr1, old_cr2, cr4, bdh, modem;
+	unsigned char cr1, old_cr1, old_cr2, cr3, cr4, bdh, modem;
 	unsigned int  baud;
 	unsigned int old_csize = old ? old->c_cflag & CSIZE : CS8;
 	unsigned int sbr, brfa;
 
 	cr1 = old_cr1 = readb(sport->port.membase + UARTCR1);
 	old_cr2 = readb(sport->port.membase + UARTCR2);
+	cr3 = readb(sport->port.membase + UARTCR3);
 	cr4 = readb(sport->port.membase + UARTCR4);
 	bdh = readb(sport->port.membase + UARTBDH);
 	modem = readb(sport->port.membase + UARTMODEM);
@@ -1295,7 +1333,12 @@ lpuart_set_termios(struct uart_port *port, struct ktermios *termios,
 		if (termios->c_cflag & CMSPAR) {
 			cr1 &= ~UARTCR1_PE;
 			cr1 |= UARTCR1_M;
-		} else {
+			if (termios->c_cflag & PARODD)
+				cr3 |= UARTCR3_T8;
+			else
+				cr3 &= ~UARTCR3_T8;
+		}
+		else {
 			cr1 |= UARTCR1_PE;
 			if ((termios->c_cflag & CSIZE) == CS8)
 				cr1 |= UARTCR1_M;
@@ -1304,7 +1347,9 @@ lpuart_set_termios(struct uart_port *port, struct ktermios *termios,
 			else
 				cr1 &= ~UARTCR1_PT;
 		}
-	}
+	} else {														//								***CLB Begin
+		cr1 &= ~UARTCTRL_PE;
+	}																//								***CLB End
 
 	/* ask the core to calculate the divisor */
 	baud = uart_get_baud_rate(port, termios, old, 50, port->uartclk / 16);
@@ -1816,6 +1861,17 @@ static int lpuart_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret;
 
+#if 0
+	gpio_request(88, "Irq debug");
+	gpio_direction_output(88, 1);
+	gpio_set_value(88, 1);
+#endif
+
+#if 1
+	gpio_request(41, "tx int debug");
+	gpio_direction_output(41, 1);
+	//        gpio_set_value(41, 1);
+#endif
 	sport = devm_kzalloc(&pdev->dev, sizeof(*sport), GFP_KERNEL);
 	if (!sport)
 		return -ENOMEM;
