@@ -645,10 +645,11 @@ gpio_set_value(88, 1);
 		sr = readb(sport->port.membase + UARTSR1);
 		rx = readb(sport->port.membase + UARTDR);
 
-		if (port->tty->index != 2)											//				***CLB Begin
+		if (port->tty->index != 2) //				***CLB Begin
 		{
 			if (uart_handle_sysrq_char(&sport->port, (unsigned char)rx))
 				continue;
+		}	// Mod'd by PFG - just don't return yet		***CLB End
 
 			if (sr & (UARTSR1_PE | UARTSR1_OR | UARTSR1_FE)) {
 				if (sr & UARTSR1_PE)
@@ -659,12 +660,14 @@ gpio_set_value(88, 1);
 				if (sr & UARTSR1_OR)
 					sport->port.icount.overrun++;
 
-				if (sr & sport->port.ignore_status_mask) {
-					if (++ignored > 100)
-						goto out;
-					continue;
-				}
-
+				if (port->tty->index != 2) //***PFG - added this to not ignore any char for BACnet
+				{
+					if (sr & sport->port.ignore_status_mask) {
+						if (++ignored > 100)
+							goto out;
+						continue;
+					}
+				}	// ***PFG
 				sr &= sport->port.read_status_mask;
 
 				if (sr & UARTSR1_PE)
@@ -679,9 +682,8 @@ gpio_set_value(88, 1);
 				sport->port.sysrq = 0;
 #endif
 			}
-		}																	//				***CLB End
 		tty_insert_flip_char(port, rx, flg);
-		goto out; // hopefully turns into byte by byte RX ***PFG
+		goto out; // turns into byte by byte RX ***PFG
 	}
 
 out:
@@ -693,7 +695,7 @@ gpio_set_value(88, 0);
 #if 0
 	gpio_set_value(88, 1);
 #endif
-	if (port->tty->index == 2) SilenceTimer = 0;							//				***CLB
+	if (port->tty->index == 2) SilenceTimer = 0;	//				***CLB
 	tty_flip_buffer_push(port);
 	return IRQ_HANDLED;
 }
