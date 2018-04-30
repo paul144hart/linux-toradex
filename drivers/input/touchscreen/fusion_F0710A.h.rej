@@ -1,0 +1,10 @@
+--- home/setra/setra/linux-bsp/linux-toradex/drivers/input/touchscreen/fusion_F0710A.h	2016-02-23 20:50:29.335459677 +0530
++++ drivers/input/touchscreen/fusion_F0710A.h	2015-10-27 15:28:35.074759056 +0530
+@@ -71,7 +71,6 @@
+ 	struct i2c_client		*client;
+ 	struct workqueue_struct	*workq;
+ 	struct input_dev		*input;
+-	int				gpio_reset;
+ 	u16						x1;
+ 	u16						y1;
+ 	u8						z1;
