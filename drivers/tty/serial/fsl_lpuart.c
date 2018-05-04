@@ -27,6 +27,7 @@
 #include <linux/serial_core.h>
 #include <linux/slab.h>
 #include <linux/tty_flip.h>
+#include <asm/gpio.h>
 
 /* All registers are 8-bit width */
 #define UARTBDH			0x00
@@ -371,7 +372,7 @@ static void lpuart_dma_tx_complete(void *arg)
 
 	if (!uart_circ_empty(xmit) && !uart_tx_stopped(&sport->port))
 		lpuart_dma_tx(sport);
-
+	gpio_set_value(88, 0);
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 }
 
@@ -507,6 +508,7 @@ static void lpuart_start_tx(struct uart_port *port)
 		if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
 			lpuart_transmit_buffer(sport);
 	}
+	gpio_set_value(88, 1);
 }
 
 /* return TIOCSER_TEMT when transmitter is not busy */
@@ -1525,6 +1527,10 @@ static int lpuart_probe(struct platform_device *pdev)
 	struct lpuart_port *sport;
 	struct resource *res;
 	int ret;
+
+	gpio_request(88,"tx int debug");
+	gpio_direction_output(88,1);
+	gpio_set_value(88,0);
 
 	sport = devm_kzalloc(&pdev->dev, sizeof(*sport), GFP_KERNEL);
 	if (!sport)
