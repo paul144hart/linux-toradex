@@ -27,6 +27,7 @@
 #include <linux/serial_core.h>
 #include <linux/slab.h>
 #include <linux/tty_flip.h>
+#include <asm/gpio.h>
 
 /* All registers are 8-bit width */
 #define UARTBDH			0x00
@@ -233,8 +234,8 @@
 #define DEV_NAME	"ttyLP"
 #define UART_NR		6
 
-//int SilenceTimer=0;						//		***CLB
-//EXPORT_SYMBOL(SilenceTimer);			//		***CLB
+int SilenceTimer=0;						//		***CLB
+EXPORT_SYMBOL(SilenceTimer);			//		***CLB
 
 static bool nodma = false;
 module_param(nodma, bool, S_IRUGO);
@@ -371,7 +372,7 @@ static void lpuart_dma_tx_complete(void *arg)
 
 	if (!uart_circ_empty(xmit) && !uart_tx_stopped(&sport->port))
 		lpuart_dma_tx(sport);
-
+	gpio_set_value(88, 0);
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 }
 
@@ -507,6 +508,7 @@ static void lpuart_start_tx(struct uart_port *port)
 		if (readb(port->membase + UARTSR1) & UARTSR1_TDRE)
 			lpuart_transmit_buffer(sport);
 	}
+	gpio_set_value(88, 1);
 }
 
 /* return TIOCSER_TEMT when transmitter is not busy */
@@ -577,8 +579,11 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 		sr = readb(sport->port.membase + UARTSR1);
 		rx = readb(sport->port.membase + UARTDR);
 
-		if (uart_handle_sysrq_char(&sport->port, (unsigned char)rx))
-			continue;
+		if(port->tty->index != 2)
+		{
+			if (uart_handle_sysrq_char(&sport->port, (unsigned char)rx))
+				continue;
+		}
 
 		if (sr & (UARTSR1_PE | UARTSR1_OR | UARTSR1_FE)) {
 			if (sr & UARTSR1_PE)
@@ -595,10 +600,13 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 				overrun++;
 			}
 
-			if (sr & sport->port.ignore_status_mask) {
-				if (++ignored > 100)
-					goto out;
-				continue;
+			if(port->tty->index != 2)
+			{
+				if (sr & sport->port.ignore_status_mask) {
+					if (++ignored > 100)
+						goto out;
+					continue;
+				}
 			}
 
 			sr &= sport->port.read_status_mask;
@@ -617,6 +625,7 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 		}
 
 		tty_insert_flip_char(port, rx, flg);
+		goto out;
 	}
 
 out:
@@ -642,6 +651,8 @@ out:
 		writeb(cr2, sport->port.membase + UARTCR2);
 	}
 	spin_unlock_irqrestore(&sport->port.lock, flags);
+
+	if(port->tty->index == 2) SilenceTimer=0;
 
 	tty_flip_buffer_push(port);
 	return IRQ_HANDLED;
@@ -1516,6 +1527,10 @@ static int lpuart_probe(struct platform_device *pdev)
 	struct lpuart_port *sport;
 	struct resource *res;
 	int ret;
+
+	gpio_request(88,"tx int debug");
+	gpio_direction_output(88,1);
+	gpio_set_value(88,0);
 
 	sport = devm_kzalloc(&pdev->dev, sizeof(*sport), GFP_KERNEL);
 	if (!sport)
