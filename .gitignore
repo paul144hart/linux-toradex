@@ -9,6 +9,14 @@
 #
 # Normal rules
 #
+# Setra rules
+arch/arm/boot/Image
+arch/arm/boot/compressed/vmlinux
+arch/arm/boot/zImage
+drivers/video/logo/logo_custom_clut224.c
+kernel/config_data.h
+#
+#
 .*
 *.o
 *.o.*
