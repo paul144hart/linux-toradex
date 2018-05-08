@@ -545,7 +545,8 @@ static int uart_write(struct tty_struct *tty,
 			}
 			if (c <= 0)
 			{
-				printk("serial_core: %d requested, %d available\n",count, c);
+				if ( count != 0 )
+					printk("serial_core: %d requested, %d available\n",count, c);
 				break;
 			}
 		}
