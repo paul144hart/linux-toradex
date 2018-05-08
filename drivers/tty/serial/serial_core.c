@@ -535,13 +535,17 @@ static int uart_write(struct tty_struct *tty,
 	spin_lock_irqsave(&port->lock, flags);
 	while (1) {
 		c = CIRC_SPACE_TO_END(circ->head, circ->tail, UART_XMIT_SIZE);
-		if((count < c)||(c<=0))
+		if (count < c)
+			c = count;
+		if(count>c)
 		{
 			printk("serial_core: %d requested, %d available\n",count, c);
-			if (count < c)
-				c = count;
-			if (c <= 0)
-				break;
+			break;
+		}
+		if (c <= 0)
+		{
+			printk("serial_core: %d requested, %d available\n",count, c);
+			break;
 		}
 		memcpy(circ->buf + circ->head, buf, c);
 		circ->head = (circ->head + c) & (UART_XMIT_SIZE - 1);
