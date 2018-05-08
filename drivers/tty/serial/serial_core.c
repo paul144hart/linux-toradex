@@ -537,15 +537,23 @@ static int uart_write(struct tty_struct *tty,
 		c = CIRC_SPACE_TO_END(circ->head, circ->tail, UART_XMIT_SIZE);
 		if (count < c)
 			c = count;
-		if(count>c)
-		{
-			printk("serial_core: %d requested, %d available\n",count, c);
-			break;
+		if ( tty->index == 2){
+			if(count>c)
+			{
+				printk("serial_core: %d requested, %d available\n",count, c);
+				break;
+			}
+			if (c <= 0)
+			{
+				printk("serial_core: %d requested, %d available\n",count, c);
+				break;
+			}
 		}
-		if (c <= 0)
-		{
-			printk("serial_core: %d requested, %d available\n",count, c);
-			break;
+		else {
+			if (c <= 0)
+			{
+				break;
+			}
 		}
 		memcpy(circ->buf + circ->head, buf, c);
 		circ->head = (circ->head + c) & (UART_XMIT_SIZE - 1);
