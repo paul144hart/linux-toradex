@@ -533,33 +533,25 @@ static int uart_write(struct tty_struct *tty,
 	}
 
 	spin_lock_irqsave(&port->lock, flags);
+	// appears we stay in this loop until all bytes are transferred into the circ buffer!
 	while (1) {
 		c = CIRC_SPACE_TO_END(circ->head, circ->tail, UART_XMIT_SIZE);
 		if (count < c)
+		{
 			c = count;
-		if ( tty->index == 2){
-			if(count>c)
-			{
-				printk("serial_core: %d requested, %d available\n",count, c);
-				//break;
-			}
-			if (c <= 0)
-			{
-				if ( count != 0 )
-					printk("serial_core: %d requested, %d available\n",count, c);
-				break;
-			}
 		}
-		else {
-			if (c <= 0)
-			{
-				break;
-			}
+		if (c <= 0)
+		{
+			break;
 		}
 		memcpy(circ->buf + circ->head, buf, c);
 		circ->head = (circ->head + c) & (UART_XMIT_SIZE - 1);
 		buf += c;
 		count -= c;
+		if ((count>c) && ( tty->index == 2))  // means there wasn't room in the buffer at the first pass
+			{
+				printk("serial_core-mstp: %d requested, %d available\n",count, c);
+			}
 		ret += c;
 	}
 
