@@ -555,11 +555,11 @@ out:
 	return IRQ_HANDLED;
 }
 
-/* This is the receive interrupt used in FLEX */
 static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 {
 	struct lpuart_port *sport = dev_id;
-	unsigned int flg, /* ignored = 0,*/ overrun = 0, framing=0;
+	//unsigned int flg, ignored = 0;
+	unsigned int flg, ignored = 0, overrun = 0, framing=0;
 	struct tty_port *port = &sport->port.state->port;
 	unsigned long flags;
 	unsigned char received_char, status_register, control_register2;
@@ -600,15 +600,18 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 				overrun++;
 			}
 
-// This code looks like why the other two port stop receiving anything!! ignored never reset
-			// if(port->tty->index != 2)
-			// {
-			// 	if (status_register & sport->port.ignore_status_mask) {
-			// 		if (++ignored > 100)
-			// 			goto out;
-			// 		continue;
-			// 	}
-			// }
+			//if(port->tty->index != 2)
+			//{
+				if (status_register & sport->port.ignore_status_mask) {
+					//if the application configured to the port to ignore
+					//any of the 3 error conditions, then just get out,
+					//no need to continue, this way we reset the 
+					//UART as quickly as possible too.
+					if (++ignored > 100)
+						goto out;
+					continue;
+				}
+			//}
 
 			status_register &= sport->port.read_status_mask;
 
@@ -616,7 +619,8 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 				flg = TTY_PARITY;
 			else if (status_register & UARTSR1_FE)
 				flg = TTY_FRAME;
-			else if (status_register & UARTSR1_OR)
+
+			if (status_register & UARTSR1_OR)
 				flg = TTY_OVERRUN;
 
 #ifdef SUPPORT_SYSRQ
@@ -624,7 +628,13 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 #endif
 		}
 
-		tty_insert_flip_char(port, received_char, flg);
+		if(port->tty->index==2)
+		{
+			if((!framing)&&(!overrun))
+				tty_insert_flip_char(port, received_char, flg);
+		}
+		else	
+			tty_insert_flip_char(port, received_char, flg);
 		goto out;
 	}
 
@@ -652,7 +662,8 @@ out:
 	}
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 
-	if(port->tty->index == 2) SilenceTimer=0;
+	if((!overrun)&&(!framing))
+		if(port->tty->index == 2) SilenceTimer=0;
 
 	tty_flip_buffer_push(port);
 	return IRQ_HANDLED;
