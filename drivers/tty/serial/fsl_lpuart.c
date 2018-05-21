@@ -555,14 +555,14 @@ out:
 	return IRQ_HANDLED;
 }
 
+/* This is the receive interrupt used in FLEX */
 static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 {
 	struct lpuart_port *sport = dev_id;
-	//unsigned int flg, ignored = 0;
-	unsigned int flg, ignored = 0, overrun = 0, framing=0;
+	unsigned int flg, /* ignored = 0,*/ overrun = 0, framing=0;
 	struct tty_port *port = &sport->port.state->port;
 	unsigned long flags;
-	unsigned char rx, sr, cr2;
+	unsigned char received_char, status_register, control_register2;
 
 	if (sport->port.irq_wake)
 		pm_wakeup_event(port->tty->dev, 0);
@@ -576,47 +576,47 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 		 * to clear the FE, OR, NF, FE, PE flags,
 		 * read SR1 then read DR
 		 */
-		sr = readb(sport->port.membase + UARTSR1);
-		rx = readb(sport->port.membase + UARTDR);
+		status_register = readb(sport->port.membase + UARTSR1);
+		received_char = readb(sport->port.membase + UARTDR);
 
 		if(port->tty->index != 2)
 		{
-			if (uart_handle_sysrq_char(&sport->port, (unsigned char)rx))
+			if (uart_handle_sysrq_char(&sport->port, (unsigned char)received_char))
 				continue;
 		}
 
-		if (sr & (UARTSR1_PE | UARTSR1_OR | UARTSR1_FE)) {
-			if (sr & UARTSR1_PE)
+		if (status_register & (UARTSR1_PE | UARTSR1_OR | UARTSR1_FE)) {
+			if (status_register & UARTSR1_PE)
 				sport->port.icount.parity++;
-			else if (sr & UARTSR1_FE)
+			else if (status_register & UARTSR1_FE)
 			{
 				//sport->port.icount.frame++;
 				framing++;
 			}
 
-			if (sr & UARTSR1_OR)
+			if (status_register & UARTSR1_OR)
 			{
 				//sport->port.icount.overrun++;
 				overrun++;
 			}
 
-			if(port->tty->index != 2)
-			{
-				if (sr & sport->port.ignore_status_mask) {
-					if (++ignored > 100)
-						goto out;
-					continue;
-				}
-			}
+// This code looks like why the other two port stop receiving anything!! ignored never reset
+			// if(port->tty->index != 2)
+			// {
+			// 	if (status_register & sport->port.ignore_status_mask) {
+			// 		if (++ignored > 100)
+			// 			goto out;
+			// 		continue;
+			// 	}
+			// }
 
-			sr &= sport->port.read_status_mask;
+			status_register &= sport->port.read_status_mask;
 
-			if (sr & UARTSR1_PE)
+			if (status_register & UARTSR1_PE)
 				flg = TTY_PARITY;
-			else if (sr & UARTSR1_FE)
+			else if (status_register & UARTSR1_FE)
 				flg = TTY_FRAME;
-
-			if (sr & UARTSR1_OR)
+			else if (status_register & UARTSR1_OR)
 				flg = TTY_OVERRUN;
 
 #ifdef SUPPORT_SYSRQ
@@ -624,7 +624,7 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 #endif
 		}
 
-		tty_insert_flip_char(port, rx, flg);
+		tty_insert_flip_char(port, received_char, flg);
 		goto out;
 	}
 
@@ -635,9 +635,9 @@ out:
 		if(framing)
 			sport->port.icount.frame += framing;
 		/* Disable receiver during this operation... */
-		cr2 = readb(sport->port.membase + UARTCR2);
-		cr2 &= ~(UARTCR2_RE);
-		writeb(cr2, sport->port.membase + UARTCR2);
+		control_register2 = readb(sport->port.membase + UARTCR2);
+		control_register2 &= ~(UARTCR2_RE);
+		writeb(control_register2, sport->port.membase + UARTCR2);
 		/* Read DR to clear the error flags */
 		readb(sport->port.membase + UARTDR);
 		/*
@@ -647,8 +647,8 @@ out:
 		writeb(UARTCFIFO_RXFLUSH, sport->port.membase + UARTCFIFO);
 		writeb(UARTSFIFO_RXOF, sport->port.membase + UARTSFIFO);
 
-		cr2 |= UARTCR2_RE;
-		writeb(cr2, sport->port.membase + UARTCR2);
+		control_register2 |= UARTCR2_RE;
+		writeb(control_register2, sport->port.membase + UARTCR2);
 	}
 	spin_unlock_irqrestore(&sport->port.lock, flags);
 

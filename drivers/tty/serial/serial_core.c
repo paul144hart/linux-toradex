@@ -550,7 +550,7 @@ static int uart_write(struct tty_struct *tty,
 		count -= c;
 		if ((count>c) && ( tty->index == 2))  // means there wasn't room in the buffer at the first pass
 			{
-				printk("serial_core-mstp: %d requested, %d available\n",count, c);
+//				printk("serial_core-mstp: %d requested, %d available\n",count, c);
 			}
 		ret += c;
 	}
