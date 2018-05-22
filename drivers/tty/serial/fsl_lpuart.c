@@ -559,7 +559,7 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 {
 	struct lpuart_port *sport = dev_id;
 	//unsigned int flg, ignored = 0;
-	unsigned int flg, ignored = 0, overrun = 0, framing=0;
+	unsigned int flg, /*ignored = 0,*/ overrun = 0, framing=0;
 	struct tty_port *port = &sport->port.state->port;
 	unsigned long flags;
 	unsigned char received_char, status_register, control_register2;
@@ -602,15 +602,15 @@ static irqreturn_t lpuart_rxint(int irq, void *dev_id)
 
 			//if(port->tty->index != 2)
 			//{
-				if (status_register & sport->port.ignore_status_mask) {
-					//if the application configured to the port to ignore
-					//any of the 3 error conditions, then just get out,
-					//no need to continue, this way we reset the 
-					//UART as quickly as possible too.
-					if (++ignored > 100)
-						goto out;
-					continue;
-				}
+				// if (status_register & sport->port.ignore_status_mask) {
+				// 	//if the application configured to the port to ignore
+				// 	//any of the 3 error conditions, then just get out,
+				// 	//no need to continue, this way we reset the 
+				// 	//UART as quickly as possible too.
+				// 	if (++ignored > 100)
+				// 		goto out;
+				// 	continue;
+				// }
 			//}
 
 			status_register &= sport->port.read_status_mask;
