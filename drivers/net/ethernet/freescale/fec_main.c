@@ -1731,6 +1731,10 @@ static void fec_enet_adjust_link(struct net_device *ndev)
 			status_change = 1;
 		}
 
+		// PFGPFG - hack to limit tpo 10MB
+		phy_dev->speed = SPEED_10;
+		fep->speed = SPEED_10;
+
 		if (phy_dev->speed != fep->speed) {
 			fep->speed = phy_dev->speed;
 			status_change = 1;
