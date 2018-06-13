@@ -765,6 +765,8 @@ static int genphy_config_advert(struct phy_device *phydev)
 	adv &= ~(ADVERTISE_ALL | ADVERTISE_100BASE4 | ADVERTISE_PAUSE_CAP |
 		 ADVERTISE_PAUSE_ASYM);
 	adv |= ethtool_adv_to_mii_adv_t(advertise);
+	adv &= ~(ADVERTISE_100HALF | ADVERTISE_100FULL | ADVERTISE_10HALF | ADVERTISE_10FULL);	// ***CLB
+	adv |= (ADVERTISE_10HALF | ADVERTISE_10FULL);						// ***CLB
 
 	if (adv != oldadv) {
 		err = phy_write(phydev, MII_ADVERTISE, adv);
@@ -1208,6 +1210,7 @@ static void of_set_phy_supported(struct phy_device *phydev)
 	if (!node)
 		return;
 
+	/* of_property_read_u32 returns 0 on success */
 	if (!of_property_read_u32(node, "max-speed", &max_speed)) {
 		/* The default values for phydev->supported are provided by the PHY
 		 * driver "features" member, we want to reset to sane defaults fist
@@ -1226,7 +1229,11 @@ static void of_set_phy_supported(struct phy_device *phydev)
 		case SPEED_10:
 			phydev->supported |= PHY_10BT_FEATURES;
 		}
-	}
+	} else {							//	***CLB Begin
+		phydev->supported &= PHY_DEFAULT_FEATURES;
+		phydev->supported &= ~(PHY_1000BT_FEATURES | PHY_100BT_FEATURES | PHY_10BT_FEATURES);
+		phydev->supported |= PHY_10BT_FEATURES;
+	}								//	***CLB End
 }
 
 /**
