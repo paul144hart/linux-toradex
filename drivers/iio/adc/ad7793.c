@@ -182,7 +182,7 @@ enum ad7793_supported_device_ids {
 static struct ad7793_platform_data ad7793_pdata =  {
 		.clock_src = AD7793_CLK_SRC_INT,
 		.unipolar = true,
-		.buffered = true,
+		.buffered = false,
 		.refsel = AD7793_REFSEL_REFIN1,
 		.bias_voltage = AD7793_BIAS_VOLTAGE_DISABLED,
 		.exitation_current = 	AD7793_IX_DISABLED, 
