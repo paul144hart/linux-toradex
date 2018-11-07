@@ -20,6 +20,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+
+/* uncomment this to enable GPIO 88 toggling for tests */
+//#define GPIO_TEST 1
 #include <linux/module.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
@@ -37,6 +40,9 @@
 
 #include <asm/irq.h>
 #include <asm/uaccess.h>
+#ifdef GPIO_TEST
+#include <asm/gpio.h>
+#endif
 
 /*
  * This is used to lock changes in serial line configuration.
@@ -534,7 +540,8 @@ static int uart_write(struct tty_struct *tty,
 
 	spin_lock_irqsave(&port->lock, flags);
 	// appears we stay in this loop until all bytes are transferred into the circ buffer!
-	while (1) {
+	while (1) 
+	{
 		c = CIRC_SPACE_TO_END(circ->head, circ->tail, UART_XMIT_SIZE);
 		if (count < c)
 		{
@@ -548,13 +555,12 @@ static int uart_write(struct tty_struct *tty,
 		circ->head = (circ->head + c) & (UART_XMIT_SIZE - 1);
 		buf += c;
 		count -= c;
-		if ((count>c) && ( tty->index == 2))  // means there wasn't room in the buffer at the first pass
-			{
-//				printk("serial_core-mstp: %d requested, %d available\n",count, c);
-			}
 		ret += c;
 	}
-
+#ifdef GPIO_TEST
+	if(tty->index==2)
+		gpio_set_value(88,1);
+#endif
 	__uart_start(tty);
 	spin_unlock_irqrestore(&port->lock, flags);
 
